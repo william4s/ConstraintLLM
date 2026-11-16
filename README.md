@@ -139,6 +139,45 @@ Common errors:
 - 404 or `code_generation_failed_or_timed_out` after a fraction of a second: usually a wrong `CONSTRAINTLLM_API_BASE` or model name. The failed request's status and message are printed as `[llm] ... status=...`.
 - 429: rate limited; increase `CONSTRAINTLLM_REQUEST_RETRIES` and the backoff.
 
+### Using Groq (free tier)
+
+[Groq](https://groq.com) also exposes an OpenAI-compatible API. Create a key in the Groq console and set:
+
+```bash
+export CONSTRAINTLLM_API_BASE="https://api.groq.com/openai/v1"
+export CONSTRAINTLLM_API_KEY="YOUR_GROQ_API_KEY"
+export CONSTRAINTLLM_MODEL="openai/gpt-oss-120b"
+export CONSTRAINTLLM_REQUEST_RETRIES=3
+export CONSTRAINTLLM_REQUEST_RETRY_BACKOFF=30
+```
+
+Models worth testing, in the order we suggest (list the models available to your key with `curl -s https://api.groq.com/openai/v1/models -H "Authorization: Bearer $CONSTRAINTLLM_API_KEY"`):
+
+| Model | Notes |
+|---|---|
+| `openai/gpt-oss-120b` | Strongest general and coding model on the free list. Test first. |
+| `qwen/qwen3.8-27b` | Same family as the project's default Qwen2.5-32B. Verify the exact name with the command above. |
+| `openai/gpt-oss-20b` | Same limits as the 120b, weaker model. Useful for cheap smoke tests. |
+
+Notes:
+- The daily token limit is the binding one. One failing case can trigger several repair calls with long prompts, so a full benchmark run does not fit. Use `--max-items` and compare methods on the same few problems.
+- With an 8K tokens-per-minute cap, expect roughly one large request per minute. A high backoff such as 30 seconds avoids wasting retries.
+- Groq offers no embedding model in this list, so `RAG` does not work. Use `DIRECT`, `COT` or `CARM`.
+- Do not set `CONSTRAINTLLM_DISABLE_THINKING` here. It sends an extra `chat_template_kwargs` field that Groq may reject.
+- Do not set `CONSTRAINTLLM_PARALLEL_WORKERS`.
+
+Example run:
+
+```bash
+PYTHONPATH=src python -m constraintllm.run_csp --method CARM --max-items 1
+```
+
+### Retry settings
+
+Two variables control how the pipeline reacts when a model request fails (implemented in `src/constraintllm/llm.py`):
+
+- `CONSTRAINTLLM_REQUEST_RETRIES` (default `2`): how many times a failed request is retried. A request is therefore tried at most `retries + 1` times.
+- `CONSTRAINTLLM_REQUEST_RETRY_BACKOFF` (default `5`): base wait time in seconds. The wait grows linearly: after the first failure the code waits `backoff` seconds, after the second `2 x backoff`, after the third `3 x backoff`, and so on.
 ## Methods
 
 This release provides the following methods:

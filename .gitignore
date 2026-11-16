@@ -40,3 +40,6 @@ logs/
 checkpoints/
 *.log
 *.xml
+
+# Local API keys
+keys
